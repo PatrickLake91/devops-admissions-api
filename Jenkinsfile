@@ -14,17 +14,18 @@ pipeline {
             }
         }
 
-                stage('Test') {
+                 stage('Test') {
             steps {
                 sh '''
                   echo "Installing Python dependencies"
-                  python3 -m pip install --no-cache-dir -r requirements.txt
+                  python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
                   echo "Running pytest for admissions eligibility API"
                   python3 -m pytest -q
                 '''
             }
         }
+
 
 
         stage('Build Docker image') {
