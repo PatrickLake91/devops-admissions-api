@@ -10,7 +10,7 @@ pipeline {
 
     stages {
 
-      stage('Test') {
+    stage('Test') {
   steps {
     sh '''
       echo "Running tests in isolated Python container (using Jenkins volume)"
@@ -18,6 +18,7 @@ pipeline {
         --volumes-from jenkins-ci \
         -w /var/jenkins_home/workspace/devops-admissions-api-pipeline \
         python:3.13-slim bash -lc "
+          export PYTHONPATH=/var/jenkins_home/workspace/devops-admissions-api-pipeline &&
           python -m pip install --upgrade pip &&
           pip install -r requirements.txt &&
           pytest -q
@@ -25,6 +26,7 @@ pipeline {
     '''
   }
 }
+
 
 
         stage('Build Docker image') {
