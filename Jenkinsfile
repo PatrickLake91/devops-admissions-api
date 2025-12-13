@@ -6,22 +6,14 @@ pipeline {
         DOCKERHUB_CREDENTIALS = "dockerhub-creds"
         EC2_SSH_CREDENTIALS   = "ec2-ssh-key"
         EC2_HOST              = "44.192.14.128"
-        PYTHONPATH            = "."
     }
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
 
         stage('Test') {
             steps {
                 sh '''
                   echo "Running tests in isolated Python container"
-
                   docker run --rm \
                     -v "$PWD:/app" \
                     -w /app \
@@ -64,15 +56,15 @@ pipeline {
             steps {
                 sshagent(credentials: [EC2_SSH_CREDENTIALS]) {
                     sh '''
-                      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
+                      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} "
                         docker pull ${DOCKER_IMAGE}:latest &&
                         docker rm -f admissions-api || true &&
-                        docker run -d \
-                          --name admissions-api \
+                        docker run -d --name admissions-api \
                           --restart unless-stopped \
                           -p 80:5000 \
-                          ${DOCKER_IMAGE}:latest
-                      '
+                          ${DOCKER_IMAGE}:latest &&
+                        curl -s http://localhost/health
+                      "
                     '''
                 }
             }
