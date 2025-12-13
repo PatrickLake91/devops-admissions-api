@@ -54,22 +54,49 @@ pipeline {
             }
         }
 
-        stage('Deploy to EC2') {
+           stage('Deploy to EC2') {
             steps {
                 sshagent(credentials: [EC2_SSH_CREDENTIALS]) {
                     sh '''
-                      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} "
-                        docker pull ${DOCKER_IMAGE}:latest &&
-                        docker rm -f admissions-api || true &&
-                        docker run -d --name admissions-api \
-                          --restart unless-stopped \
-                          -p 80:5000 \
-                          ${DOCKER_IMAGE}:latest &&
-                        curl -s http://localhost/health
-                      "
+                      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} 'bash -se' <<'REMOTE'
+                        set -euo pipefail
+
+                        IMAGE="${DOCKER_IMAGE}:latest"
+                        NAME="admissions-api"
+                        HEALTH_URL="http://localhost/health"
+
+                        echo "Pulling $IMAGE..."
+                        docker pull "$IMAGE"
+
+                        echo "Stopping/removing existing container (if any)..."
+                        docker rm -f "$NAME" >/dev/null 2>&1 || true
+
+                        echo "Starting new container..."
+                        docker run -d --name "$NAME" --restart unless-stopped -p 80:5000 "$IMAGE" >/dev/null
+
+                        echo "Waiting for health endpoint: $HEALTH_URL"
+                        # Retry up to ~60s (30 * 2s)
+                        for i in $(seq 1 30); do
+                          if curl -fsS --max-time 2 "$HEALTH_URL" >/dev/null; then
+                            echo "Healthy on attempt $i"
+                            curl -fsS --max-time 2 "$HEALTH_URL" || true
+                            exit 0
+                          fi
+
+                          echo "Not healthy yet (attempt $i/30). Diagnostics:"
+                          docker ps --filter "name=$NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || true
+                          docker logs --tail 50 "$NAME" || true
+                          sleep 2
+                        done
+
+                        echo "ERROR: Service did not become healthy in time."
+                        echo "Final diagnostics:"
+                        docker ps --filter "name=$NAME" || true
+                        docker logs --tail 200 "$NAME" || true
+                        exit 1
+REMOTE
                     '''
                 }
             }
         }
-    }
-}
+
