@@ -15,22 +15,30 @@ pipeline {
         }
 
         stage('Test') {
-    steps {
-        sh '''
-          echo "Running tests in isolated Python container"
-          docker run --rm \
-            --volumes-from jenkins-ci \
-            -w "$WORKSPACE" \
-            python:3.13-slim \
-            bash -lc "
-              python -m pip install --upgrade pip &&
-              pip install -r requirements.txt &&
-              pip install pytest &&
-              pytest -q
-            "
-        '''
-    }
+  steps {
+    sh '''
+      echo "Running tests in isolated Python container (debug first)"
+      docker run --rm \
+        --volumes-from jenkins-ci \
+        -w "$WORKSPACE" \
+        -e PYTHONPATH="$WORKSPACE" \
+        python:3.13-slim \
+        bash -lc '
+          set -euxo pipefail
+          echo "PWD=$(pwd)"
+          echo "Listing workspace:"
+          ls -la
+          echo "Listing app folder if present:"
+          ls -la app || true
+          python -c "import sys; print('sys.path='); print('\\n'.join(sys.path))"
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pytest -q
+        '
+    '''
+  }
 }
+
 
 
         stage('Build Docker image') {
