@@ -54,22 +54,40 @@ pipeline {
             }
         }
 
-        stage('Deploy to EC2') {
-            steps {
-                sshagent(credentials: [EC2_SSH_CREDENTIALS]) {
-                    sh '''
-                      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} "
-                        docker pull ${DOCKER_IMAGE}:latest &&
-                        docker rm -f admissions-api || true &&
-                        docker run -d --name admissions-api \
-                          --restart unless-stopped \
-                          -p 80:5000 \
-                          ${DOCKER_IMAGE}:latest &&
-                        curl -s http://localhost/health
-                      "
-                    '''
-                }
-            }
-        }
+     stage('Deploy to EC2') {
+  steps {
+    sshagent(credentials: [EC2_SSH_CREDENTIALS]) {
+      sh """
+        set -e
+        echo "Deploying to EC2 (${EC2_HOST})"
+
+        ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
+          set -e
+
+          docker pull ${DOCKER_IMAGE}:latest
+          docker rm -f admissions-api >/dev/null 2>&1 || true
+          docker run -d --name admissions-api --restart unless-stopped -p 80:5000 ${DOCKER_IMAGE}:latest
+
+          echo "Waiting for /health..."
+          for i in \$(seq 1 20); do
+            if curl -fsS http://localhost/health >/dev/null; then
+              echo "Health check OK"
+              curl -fsS http://localhost/health
+              exit 0
+            fi
+            echo "Not ready yet (\$i/20) - sleeping 2s"
+            sleep 2
+          done
+
+          echo "Health check failed after retries"
+          echo "--- docker ps ---"
+          docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"
+          echo "--- last 120 lines of logs ---"
+          docker logs --tail 120 admissions-api || true
+          exit 1
+        '
+      """
     }
+  }
 }
+
