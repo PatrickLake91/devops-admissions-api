@@ -52,51 +52,49 @@ pipeline {
             }
         }
 
-        stage('Deploy to EC2') {
+               stage('Deploy to EC2') {
             steps {
                 sshagent(credentials: [EC2_SSH_CREDENTIALS]) {
                     sh '''
-                      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} 'bash -se' <<'REMOTE'
-set -euo pipefail
+                      set -e
 
-IMAGE="st20285217/admissions-api:latest"
-NAME="admissions-api"
-HEALTH_URL="http://localhost/health"
+                      ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} "
+                        set -e
 
-echo "Pulling $IMAGE..."
-docker pull "$IMAGE"
+                        IMAGE=st20285217/admissions-api:latest
+                        NAME=admissions-api
+                        HEALTH_URL=http://localhost/health
 
-echo "Stopping/removing existing container (if any)..."
-docker rm -f "$NAME" >/dev/null 2>&1 || true
+                        echo Pulling \\$IMAGE...
+                        docker pull \\$IMAGE
 
-echo "Starting new container..."
-docker run -d --name "$NAME" --restart unless-stopped -p 80:5000 "$IMAGE" >/dev/null
+                        echo Removing old container if present...
+                        docker rm -f \\$NAME >/dev/null 2>&1 || true
 
-echo "Waiting for health endpoint: $HEALTH_URL"
-for i in $(seq 1 30); do
-  if curl -fsS --max-time 2 "$HEALTH_URL" >/dev/null; then
-    echo "Healthy on attempt $i"
-    curl -fsS --max-time 2 "$HEALTH_URL" || true
-    exit 0
-  fi
+                        echo Starting new container...
+                        docker run -d --name \\$NAME --restart unless-stopped -p 80:5000 \\$IMAGE >/dev/null
 
-  echo "Not healthy yet (attempt $i/30). Diagnostics:"
-  docker ps --filter "name=$NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || true
-  docker logs --tail 50 "$NAME" || true
-  sleep 2
-done
+                        echo Waiting for health endpoint...
+                        i=1
+                        while [ \\$i -le 30 ]; do
+                          if curl -fsS --max-time 2 \\$HEALTH_URL >/dev/null; then
+                            echo Healthy on attempt \\$i
+                            curl -fsS --max-time 2 \\$HEALTH_URL || true
+                            exit 0
+                          fi
 
-echo "ERROR: Service did not become healthy in time."
-echo "Final diagnostics:"
-docker ps --filter "name=$NAME" || true
-docker logs --tail 200 "$NAME" || true
-exit 1
-REMOTE
+                          echo Not healthy yet attempt \\$i/30
+                          docker ps --filter name=\\$NAME || true
+                          docker logs --tail 50 \\$NAME || true
+                          i=\\$((i+1))
+                          sleep 2
+                        done
+
+                        echo ERROR service did not become healthy
+                        docker logs --tail 200 \\$NAME || true
+                        exit 1
+                      "
                     '''
                 }
             }
         }
-    }
-}
-
-
