@@ -10,24 +10,22 @@ pipeline {
 
     stages {
 
-   stage('Test') {
-    steps {
-        sh '''
-          echo "Running tests in isolated Python container (using Jenkins volume)"
-          docker run --rm \
-            --volumes-from jenkins-ci \
-            -w /var/jenkins_home/workspace/devops-admissions-api-pipeline \
-            python:3.13-slim bash -lc "
-              export PYTHONPATH=/var/jenkins_home/workspace/devops-admissions-api-pipeline &&
-              python -m pip install --upgrade pip &&
-              pip install -r requirements.txt &&
-              pytest -q
-            "
-        '''
-    }
-}
-
-
+        stage('Test') {
+            steps {
+                sh '''
+                  echo "Running tests in isolated Python container (using Jenkins volume)"
+                  docker run --rm \
+                    --volumes-from jenkins-ci \
+                    -w /var/jenkins_home/workspace/devops-admissions-api-pipeline \
+                    python:3.13-slim bash -lc "
+                      export PYTHONPATH=/var/jenkins_home/workspace/devops-admissions-api-pipeline &&
+                      python -m pip install --upgrade pip &&
+                      pip install -r requirements.txt &&
+                      pytest -q
+                    "
+                '''
+            }
+        }
 
         stage('Build Docker image') {
             steps {
@@ -54,7 +52,7 @@ pipeline {
             }
         }
 
-           stage('Deploy to EC2') {
+        stage('Deploy to EC2') {
             steps {
                 sshagent(credentials: [EC2_SSH_CREDENTIALS]) {
                     sh '''
@@ -99,4 +97,6 @@ REMOTE
                 }
             }
         }
+    }
+}
 
