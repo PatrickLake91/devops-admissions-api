@@ -3,7 +3,7 @@ FROM python:3.11-slim
 # Set working directory inside the container
 WORKDIR /app
 
-# Ensure Python prints straight to console and our app package is on the path
+# Ensure Python prints straight to console and the application package is on the path
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
