@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admissions-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admissions-api
+  template:
+    metadata:
+      labels:
+        app: admissions-api
+    spec:
+      containers:
+        - name: admissions-api
+          image: st20285217/admissions-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
