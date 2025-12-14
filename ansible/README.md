@@ -12,4 +12,5 @@ What it does:
 - Waits until /health returns HTTP 200
 
 Run (from Windows using Docker):
-docker run --rm -it -v ${PWD}:/work -w /work cytopia/ansible:latest sh -lc "chmod 600 ec2-key.pem && ansible-playbook playbook.yml"
+docker run --rm -it -v ${PWD}:/work -w /work cytopia/ansible:latest sh -lc "apk add --no-cache openssh-client && chmod 600 ec2-key.pem && ansible-playbook -i inventory.ini playbook.yml"
+
