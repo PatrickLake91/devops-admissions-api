@@ -59,7 +59,7 @@ pipeline {
                       ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} 'bash -se' <<'REMOTE'
                         set -euo pipefail
 
-                        IMAGE="${DOCKER_IMAGE}:latest"
+                        IMAGE="st20285217/admissions-api:latest"
                         NAME="admissions-api"
                         HEALTH_URL="http://localhost/health"
 
@@ -73,7 +73,6 @@ pipeline {
                         docker run -d --name "$NAME" --restart unless-stopped -p 80:5000 "$IMAGE" >/dev/null
 
                         echo "Waiting for health endpoint: $HEALTH_URL"
-                        # Retry up to ~60s (30 * 2s)
                         for i in $(seq 1 30); do
                           if curl -fsS --max-time 2 "$HEALTH_URL" >/dev/null; then
                             echo "Healthy on attempt $i"
@@ -81,15 +80,13 @@ pipeline {
                             exit 0
                           fi
 
-                          echo "Not healthy yet (attempt $i/30). Diagnostics:"
-                          docker ps --filter "name=$NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || true
-                          docker logs --tail 50 "$NAME" || true
+                          echo "Not healthy yet (attempt $i/30)"
+                          docker ps --filter "name=$NAME" || true
+                          docker logs --tail 20 "$NAME" || true
                           sleep 2
                         done
 
-                        echo "ERROR: Service did not become healthy in time."
-                        echo "Final diagnostics:"
-                        docker ps --filter "name=$NAME" || true
+                        echo "ERROR: Service did not become healthy"
                         docker logs --tail 200 "$NAME" || true
                         exit 1
 REMOTE
@@ -97,6 +94,5 @@ REMOTE
                 }
             }
         }
-    }
-}
+
 
