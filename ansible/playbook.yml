@@ -1,0 +1,60 @@
+- name: Configure EC2 and deploy Admissions API container
+  hosts: web
+  become: true
+
+  vars:
+    app_name: admissions-api
+    image: st20285217/admissions-api:latest
+    host_port: "80"
+    container_port: "5000"
+    health_url: "http://localhost/health"
+
+  tasks:
+    - name: Ensure system packages are up to date
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+
+    - name: Install Docker
+      ansible.builtin.dnf:
+        name: docker
+        state: present
+
+    - name: Enable and start Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add ec2-user to docker group
+      ansible.builtin.user:
+        name: ec2-user
+        groups: docker
+        append: true
+
+    - name: Pull latest image
+      ansible.builtin.command: docker pull {{ image }}
+
+    - name: Remove existing container if present
+      ansible.builtin.command: docker rm -f {{ app_name }}
+      register: rm_result
+      failed_when: false
+      changed_when: rm_result.rc == 0
+
+    - name: Run container
+      ansible.builtin.command: >
+        docker run -d --name {{ app_name }}
+        --restart unless-stopped
+        -p {{ host_port }}:{{ container_port }}
+        {{ image }}
+
+    - name: Wait for health endpoint to become ready (retry-based)
+      ansible.builtin.shell: curl -fsS --max-time 2 {{ health_url }}
+      register: health
+      retries: 30
+      delay: 2
+      until: health.rc == 0
+
+    - name: Show health response
+      ansible.builtin.debug:
+        var: health.stdout

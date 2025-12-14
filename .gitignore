@@ -2,3 +2,10 @@ __pycache__/
 pytest_cache/
 *.pyc
 venv/
+ansible/*.pem
+ansible/*.key
+
+# Ansible secrets
+ansible/*.pem
+ansible/ec2-key.pem
+
